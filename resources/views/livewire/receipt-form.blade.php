@@ -1,4 +1,20 @@
 <div class="space-y-6">
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+            <button wire:click="switchTab('receipt')" 
+                    class="py-2 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'receipt' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                Receipt Generator
+            </button>
+            <button wire:click="switchTab('html')" 
+                    class="py-2 px-1 border-b-2 font-medium text-sm {{ $activeTab === 'html' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                HTML to PDF
+            </button>
+        </nav>
+    </div>
+
+    <!-- Receipt Generator Tab -->
+    @if($activeTab === 'receipt')
     <form wire:submit.prevent="generateReceipt" class="space-y-6">
         <!-- Customer Name -->
         <div>
@@ -91,6 +107,85 @@
             </button>
         </div>
     </form>
+    @endif
+
+    <!-- HTML to PDF Tab -->
+    @if($activeTab === 'html')
+    <form wire:submit.prevent="generateHtmlPdf" class="space-y-6">
+        <!-- Template Selection -->
+        <div class="bg-gray-50 p-4 rounded-md">
+            <h4 class="text-sm font-medium text-gray-900 mb-3">Quick Templates</h4>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" wire:click="loadTemplate('invoice')" 
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Invoice Template
+                </button>
+                <button type="button" wire:click="loadTemplate('report')" 
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Report Template
+                </button>
+                <button type="button" wire:click="loadTemplate('certificate')" 
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Certificate Template
+                </button>
+            </div>
+        </div>
+
+        <div>
+            <label for="htmlContent" class="block text-sm font-medium text-gray-700 mb-2">
+                HTML Content
+            </label>
+            <p class="text-sm text-gray-600 mb-4">
+                Enter your HTML content below. You can use basic HTML tags and the following CSS classes:
+                <code>text-center</code>, <code>text-right</code>, <code>font-bold</code>, <code>mt-4</code>, <code>mb-4</code>, 
+                <code>p-4</code>, <code>border</code>, <code>rounded</code>, <code>bg-gray-100</code>, <code>bg-blue-100</code>, etc.
+            </p>
+            
+            <textarea 
+                id="htmlContent" 
+                wire:model="htmlContent" 
+                rows="15" 
+                required
+                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono"
+                placeholder="Example:
+<div class='text-center'>
+    <h1>My Document</h1>
+    <p class='mb-4'>This is a sample document</p>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Item</th>
+            <th>Description</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Product 1</td>
+            <td>Description here</td>
+            <td class='text-right'>$100.00</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class='text-right mt-4'>
+    <p class='font-bold'>Total: $100.00</p>
+</div>"></textarea>
+            @error('htmlContent') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+        </div>
+
+        <!-- Generate Button -->
+        <div class="text-center">
+            <button type="submit"
+                    class="inline-flex justify-center py-3 px-6 border border-transparent shadow-sm text-base font-medium rounded-md
+                           text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                Generate PDF from HTML
+            </button>
+        </div>
+    </form>
+    @endif
 
     <!-- Success Message -->
     @if ($receiptGenerated)
