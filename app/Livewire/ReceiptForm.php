@@ -6,6 +6,7 @@ use Livewire\Component;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
+use App\Models\Template;
 
 class ReceiptForm extends Component
 {
@@ -14,7 +15,15 @@ class ReceiptForm extends Component
     public $receiptGenerated = false;
     public $receiptUrl = '';
     public $htmlContent = '';
-    public $activeTab = 'receipt'; // 'receipt' or 'html'
+    public $activeTab = 'receipt'; // 'receipt', 'html', or 'templates'
+    public $selectedTemplate = null;
+    public $selectedTemplateType = 'pdf';
+    public $templateName = '';
+    public $templateDescription = '';
+    public $showTemplateModal = false;
+    public $showPreviewModal = false;
+    public $previewContent = '';
+    public $editingTemplate = null;
 
     public function mount()
     {
@@ -335,13 +344,167 @@ class ReceiptForm extends Component
         $this->htmlContent = $templates[$templateName] ?? '';
     }
 
+    public function getTemplatesByType()
+    {
+        return Template::byType($this->selectedTemplateType)->get();
+    }
+
+    public function selectTemplate($templateId)
+    {
+        $template = Template::find($templateId);
+        if ($template) {
+            $this->selectedTemplate = $template;
+            $this->htmlContent = $template->content;
+        }
+    }
+
+    public function openTemplateModal()
+    {
+        $this->showTemplateModal = true;
+        $this->resetTemplateForm();
+    }
+
+    public function closeTemplateModal()
+    {
+        $this->showTemplateModal = false;
+        $this->resetTemplateForm();
+    }
+
+    public function resetTemplateForm()
+    {
+        $this->templateName = '';
+        $this->templateDescription = '';
+        $this->editingTemplate = null;
+    }
+
+    public function saveTemplate()
+    {
+        $this->validate([
+            'templateName' => 'required|string|max:255',
+            'templateDescription' => 'nullable|string|max:500',
+            'htmlContent' => 'required|string|min:10',
+            'selectedTemplateType' => 'required|in:pdf,email,sms'
+        ]);
+
+        if ($this->editingTemplate) {
+            // Update existing template
+            $this->editingTemplate->update([
+                'name' => $this->templateName,
+                'description' => $this->templateDescription,
+                'content' => $this->htmlContent,
+                'type' => $this->selectedTemplateType
+            ]);
+            session()->flash('success', 'Template updated successfully!');
+        } else {
+            // Create new template
+            Template::create([
+                'name' => $this->templateName,
+                'description' => $this->templateDescription,
+                'content' => $this->htmlContent,
+                'type' => $this->selectedTemplateType,
+                'is_default' => false
+            ]);
+            session()->flash('success', 'Template saved successfully!');
+        }
+
+        $this->closeTemplateModal();
+    }
+
+    public function editTemplate($templateId)
+    {
+        $template = Template::find($templateId);
+        if ($template) {
+            $this->editingTemplate = $template;
+            $this->templateName = $template->name;
+            $this->templateDescription = $template->description;
+            $this->htmlContent = $template->content;
+            $this->selectedTemplateType = $template->type;
+            $this->showTemplateModal = true;
+        }
+    }
+
+    public function deleteTemplate($templateId)
+    {
+        $template = Template::find($templateId);
+        if ($template && !$template->is_default) {
+            $template->delete();
+            session()->flash('success', 'Template deleted successfully!');
+        } else {
+            session()->flash('error', 'Cannot delete default templates.');
+        }
+    }
+
+    public function previewTemplate($templateId)
+    {
+        $template = Template::find($templateId);
+        if ($template) {
+            $this->previewContent = $this->renderTemplatePreview($template);
+            $this->showPreviewModal = true;
+        }
+    }
+
+    public function closePreviewModal()
+    {
+        $this->showPreviewModal = false;
+        $this->previewContent = '';
+    }
+
+    private function renderTemplatePreview($template)
+    {
+        $sampleData = [
+            'customer_name' => 'John Doe',
+            'company_name' => 'Your Company',
+            'date' => date('F j, Y'),
+            'invoice_number' => 'INV-2025-001',
+            'receipt_number' => 'REC-2025-001',
+            'total' => '150.00',
+            'subtotal' => '135.00',
+            'tax' => '15.00',
+            'discount' => '0.00'
+        ];
+
+        $content = $template->content;
+        
+        // Simple template variable replacement
+        foreach ($sampleData as $key => $value) {
+            $content = str_replace('{{' . $key . '}}', $value, $content);
+        }
+
+        // Handle simple loops for items (basic implementation)
+        if (strpos($content, '{{#items}}') !== false) {
+            $itemsSection = preg_match('/{{#items}}(.*?){{\/items}}/s', $content, $matches);
+            if ($itemsSection) {
+                $itemTemplate = $matches[1];
+                $sampleItems = [
+                    ['name' => 'Sample Item 1', 'quantity' => '2', 'price' => '50.00', 'total' => '100.00'],
+                    ['name' => 'Sample Item 2', 'quantity' => '1', 'price' => '50.00', 'total' => '50.00']
+                ];
+                
+                $itemsHtml = '';
+                foreach ($sampleItems as $index => $item) {
+                    $itemHtml = $itemTemplate;
+                    $itemHtml = str_replace('{{index}}', $index + 1, $itemHtml);
+                    foreach ($item as $key => $value) {
+                        $itemHtml = str_replace('{{' . $key . '}}', $value, $itemHtml);
+                    }
+                    $itemsHtml .= $itemHtml;
+                }
+                
+                $content = preg_replace('/{{#items}}.*?{{\/items}}/s', $itemsHtml, $content);
+            }
+        }
+
+        return $content;
+    }
+
     public function render()
     {
         $subtotal = $this->calculateSubtotal();
         $tax = $this->calculateTax($subtotal);
         $discount = $this->calculateDiscount($subtotal);
         $total = $this->calculateTotal();
+        $templates = $this->getTemplatesByType();
 
-        return view('livewire.receipt-form', compact('subtotal', 'tax', 'discount', 'total'));
+        return view('livewire.receipt-form', compact('subtotal', 'tax', 'discount', 'total', 'templates'));
     }
 }
